@@ -7,3 +7,4 @@ hash.o hydraul.o inpfile.o input1.o input2.o input3.o \
 mempool.o output.o quality.o report.o rules.o smatrix.o
 /sbin/ldconfig -v -n .
 ln -sf libepanet.so.2 libepanet.so
+mv libepanet* ../
