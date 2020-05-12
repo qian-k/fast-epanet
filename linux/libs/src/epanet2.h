@@ -132,6 +132,7 @@
 
 
 
+
 // --- define WINDOWS
 
 #undef WINDOWS
@@ -225,5 +226,11 @@
  int   DLLEXPORT ENsetoption(int, float);
  int   DLLEXPORT ENsetstatusreport(int);
  int   DLLEXPORT ENsetqualtype(int, char *, char *, char *);
+
+
+int analyze_report(char *report);
+int ENFitnessInit(char *input, char *report);
+int ENFitnessEvaluate(int node, int stime, int duration, int concentration);
+int ENFitnessTerminate();
 
 #endif

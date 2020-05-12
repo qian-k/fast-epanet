@@ -1,9 +1,9 @@
 #!/bin/sh
 # Creates the epanet2 shared library
 gcc -fPIC -c epanet.c hash.c hydraul.c inpfile.c input1.c input2.c input3.c \
-mempool.c output.c quality.c report.c rules.c smatrix.c
+mempool.c output.c quality.c report.c rules.c smatrix.c fitness.c
 ld -shared -soname libepanet.so.2 -o libepanet.so.2.11 -lc -lm epanet.o \
-hash.o hydraul.o inpfile.o input1.o input2.o input3.o \
+hash.o hydraul.o inpfile.o input1.o input2.o input3.o fitness.o \
 mempool.o output.o quality.o report.o rules.o smatrix.o
 /sbin/ldconfig -v -n .
 ln -sf libepanet.so.2 libepanet.so
