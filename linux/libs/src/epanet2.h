@@ -229,8 +229,9 @@
 
 
 int analyze_report(char *report);
+int ENFitnessPreset(int num, int steps);
 int ENFitnessInit(char *input, char *report);
-int ENFitnessEvaluate(int node, int stime, int duration, int concentration);
+float ENFitnessEvaluate(int node, int stime, int duration, int concentration);
 int ENFitnessTerminate();
 
 #endif

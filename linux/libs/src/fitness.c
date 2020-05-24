@@ -4,7 +4,7 @@
 #include "epanet2.h"
 #include "toolkit.h"
 
-#define SENSOR_NUMBER 9
+//#define SENSOR_NUMBER 9
 #define NODE_SECTION "Node Results"
 #define EXTERN extern
 
@@ -13,9 +13,12 @@ typedef struct nodeinfo{
 	float *Cr;
 } SensorNode;
 
+static int SENSOR_NUMBER = 4;
+static int TIME_STEPS    = 12;
 
-SensorNode sensor_nodes[SENSOR_NUMBER];
-char *sensor[SENSOR_NUMBER]={"117", "141", "161", "181", "199", "209", "239", "261", "40"};
+SensorNode sensor_nodes[10];
+//char *sensor[SENSOR_NUMBER]={"117", "141", "161", "181", "199", "209", "239", "261", "40"};
+char *sensor[10]={"10", "119", "143", "163", "183", "20", "213", "243", "265", "601"};
 
 int analyze_report(char *report){
 
@@ -76,6 +79,13 @@ int analyze_report(char *report){
 	
 }
 
+int ENFitnessPreset(int num, int steps){
+
+	SENSOR_NUMBER = num;
+	TIME_STEPS = steps;
+	return 0;
+}
+
 int ENFitnessInit(char *input, char *report){
 
 	int i, err = 0;
@@ -95,6 +105,7 @@ int ENFitnessInit(char *input, char *report){
 	steps = duration / step + 1;
 
 	for (i=0; i<SENSOR_NUMBER; i++){
+
 		ENgetnodeindex(sensor[i], &sensor_nodes[i].index );
 		sensor_nodes[i].Cr = (float *) malloc( steps * sizeof(float) );
 		if (sensor_nodes[i].Cr == NULL){
@@ -108,14 +119,16 @@ int ENFitnessInit(char *input, char *report){
 
 	
 EXIT:
+	printf("ENFitnessInit return with error code: %d\n", err);
 	return err;
 }
 
-int ENFitnessEvaluate(int node, int stime, int duration, int concentration){
+
+float ENFitnessEvaluate(int node, int stime, int duration, int concentration){
 
 	int i, err; 
 	int pindex, nindex;
-	long t, tstep, step; 
+	long t, tstep, step, start_step = -1; 
 	float c, fitness, pattern[24];
 	char node_id[16];
 
@@ -149,10 +162,17 @@ int ENFitnessEvaluate(int node, int stime, int duration, int concentration){
 	do { 
 		ENrunQ(&t); 
   		ENstepQ(&tstep); 
+		if (start_step != -1 && step - start_step >= TIME_STEPS)
+			continue;
 		for(i=0; i<SENSOR_NUMBER; i++){
 			ENgetnodevalue(sensor_nodes[i].index, EN_QUALITY, &c);
-			fitness += (sensor_nodes[i].Cr[step] - c) * (sensor_nodes[i].Cr[step] - c);
-//			printf("[%d][%d]Real %f, Sim %f\n", i, step, sensor_nodes[i].Cr[step], c);
+			//if (c > 0 || sensor_nodes[i].Cr[step] > 0){
+			if (sensor_nodes[i].Cr[step] > 0){
+				fitness += (sensor_nodes[i].Cr[step] - c) * (sensor_nodes[i].Cr[step] - c);
+				if (start_step == -1 && sensor_nodes[i].Cr[step] > 0){
+					start_step = step;
+				}
+			}
 		}
 		step++;
 	} while (tstep > 0); 
@@ -160,10 +180,9 @@ int ENFitnessEvaluate(int node, int stime, int duration, int concentration){
 	if((err = ENsetnodevalue(nindex, EN_SOURCEQUAL, 0)) != 0)
 		goto EXIT;
 
-	//printf("Fitness: %f\n", fitness);
-
 	return fitness;
 EXIT:
+	printf("ENFitnessEvaluate return with error code:%d\n", err);
 	return -1;
 
 }
