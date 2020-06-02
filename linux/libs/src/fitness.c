@@ -20,7 +20,7 @@ SensorNode sensor_nodes[10];
 //char *sensor[SENSOR_NUMBER]={"117", "141", "161", "181", "199", "209", "239", "261", "40"};
 char *sensor[10]={"10", "119", "143", "163", "183", "20", "213", "243", "265", "601"};
 
-int analyze_report(char *report){
+int analyze_report(char *rpt){
 
 	FILE *fp = NULL;
 	int i = 0;
@@ -31,7 +31,7 @@ int analyze_report(char *report){
 	char *node_id, *tmp, line[100];
 	float concentration;
 
-	if( (fp = fopen(report, "r")) == NULL )
+	if( (fp = fopen(rpt, "r")) == NULL )
 		return -1;
 
 	while (fgets(line, sizeof(line), fp) != NULL){
@@ -58,12 +58,13 @@ int analyze_report(char *report){
 			if(i >= SENSOR_NUMBER)
 				continue;
 
-			tmp = strtok(NULL, " \t");
-			tmp = strtok(NULL, " \t");
-			tmp = strtok(NULL, " \t");
-			tmp = strtok(NULL, " \t");
+			tmp = strtok(NULL, " \r\t\n");
+			tmp = strtok(NULL, " \r\t\n");
+			tmp = strtok(NULL, " \r\t\n");
+			tmp = strtok(NULL, " \r\t\n");
 			concentration = atof(tmp);
 			sensor_nodes[i].Cr[step] = concentration;
+		//printf("RPT-Set sensor %s at time %d: %f\n", sensor[i], step, concentration);
 		}
 		else if(strstr(line, NODE_SECTION) != NULL){
 			in_node_section = 1;	
@@ -79,6 +80,53 @@ int analyze_report(char *report){
 	
 }
 
+int analyze_csv(char *csv){
+
+	FILE *fp = NULL;
+	int i, step, node_index, node_index_pre, devour;
+	char *node_id, *tmp, line[100];
+	float concentration;
+
+	devour = 1;
+	step = -1;
+	node_index_pre = -1;
+
+	if ((fp = fopen(csv, "r")) == NULL)
+		return -1;
+
+	while (fgets(line, sizeof(line), fp) != NULL){
+		if(devour > 0 ){
+			devour--;
+			continue;
+		}
+		node_id = strtok(line, ", \r\t\n");
+		if(node_id == NULL){
+			return -1;
+		}
+		ENgetnodeindex(node_id, &node_index);
+		if(node_index_pre == -1 || node_index != node_index_pre)
+			step = 0;
+		else
+			step++;
+		node_index_pre = node_index;
+		for(i=0; i<SENSOR_NUMBER; i++){
+			if(sensor_nodes[i].index == node_index)
+				break;
+		}
+		if(i >= SENSOR_NUMBER)
+			continue;
+		tmp = strtok(NULL, ", \t\r\n");
+		tmp = strtok(NULL, ", \t\r\n");
+		concentration = atof(tmp);
+		//printf("CSV-Set sensor %s at time %d: %f\n", sensor[i], step, concentration);
+		sensor_nodes[i].Cr[step] = concentration;
+	}
+
+	fclose(fp);
+
+	return 0;
+}
+
 int ENFitnessPreset(int num, int steps){
 
 	SENSOR_NUMBER = num;
@@ -88,8 +136,9 @@ int ENFitnessPreset(int num, int steps){
 
 int ENFitnessInit(char *input, char *report){
 
-	int i, err = 0;
+	int i, len, err = 0;
 	long duration, step, steps;
+	char *suffix;
 
 	if( (err = ENopen(input, "tmp.rpt", "")) != 0 )
 		goto EXIT;
@@ -114,10 +163,24 @@ int ENFitnessInit(char *input, char *report){
 		}
 	}
 
-	if( (err = analyze_report(report)) != 0 )
+	len = strlen(report);
+	if(len <=3 ){
+		err = -1;
 		goto EXIT;
+	}
+	suffix = &report[len-3];
 
-	
+	if(strncmp(suffix, "rpt", 3) == 0){
+		if( (err = analyze_report(report)) != 0 )
+			goto EXIT;
+	}
+	else if(strncmp(suffix, "csv", 3) == 0){
+		if( (err = analyze_csv(report)) != 0 )
+			goto EXIT;
+	}
+	else
+		err = -1;
+
 EXIT:
 	printf("ENFitnessInit return with error code: %d\n", err);
 	return err;
@@ -131,6 +194,7 @@ float ENFitnessEvaluate(int node, int stime, int duration, int concentration){
 	long t, tstep, step, start_step = -1; 
 	float c, fitness, pattern[24];
 	char node_id[16];
+	int tt=-1;
 
 	fitness = 0;
 	step = 1;
@@ -162,12 +226,14 @@ float ENFitnessEvaluate(int node, int stime, int duration, int concentration){
 	do { 
 		ENrunQ(&t); 
   		ENstepQ(&tstep); 
+		tt++;
 		if (start_step != -1 && step - start_step >= TIME_STEPS)
 			continue;
 		for(i=0; i<SENSOR_NUMBER; i++){
 			ENgetnodevalue(sensor_nodes[i].index, EN_QUALITY, &c);
 			//if (c > 0 || sensor_nodes[i].Cr[step] > 0){
 			if (sensor_nodes[i].Cr[step] > 0){
+	//printf("step:%d 1-%f, 2-%f\n", step, sensor_nodes[i].Cr[step], c);
 				fitness += (sensor_nodes[i].Cr[step] - c) * (sensor_nodes[i].Cr[step] - c);
 				if (start_step == -1 && sensor_nodes[i].Cr[step] > 0){
 					start_step = step;
@@ -176,6 +242,7 @@ float ENFitnessEvaluate(int node, int stime, int duration, int concentration){
 		}
 		step++;
 	} while (tstep > 0); 
+	//printf("Final step:%d\n", tt);
 
 	if((err = ENsetnodevalue(nindex, EN_SOURCEQUAL, 0)) != 0)
 		goto EXIT;
